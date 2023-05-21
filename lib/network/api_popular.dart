@@ -1,0 +1,45 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+import 'package:primer_proyecto/models/movie_model.dart';
+import 'package:primer_proyecto/models/actors_movie.dart';
+
+class ApiPopular {
+  Uri link = Uri.parse(
+      'https://api.themoviedb.org/3/movie/popular?api_key=a312589363702724132147d44222494f&language=es-MX&page=1');
+
+  Future<List<MovieModel>?> getAllPopular() async {
+    var result = await http.get(link);
+    var listJSON = jsonDecode(result.body)['results'] as List;
+    if (result.statusCode == 200) {
+      return listJSON.map((popular) => MovieModel.fromMap(popular)).toList();
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> getTrailer(int movieId) async {
+    final response = await http.get(
+      Uri.parse(
+          'https://api.themoviedb.org/3/movie/$movieId/videos?api_key=a312589363702724132147d44222494f'),
+    );
+
+    final data = jsonDecode(response.body);
+    final trailer = data['results'].firstWhere(
+      (video) => video['site'] == 'YouTube' && video['type'] == 'Trailer',
+      orElse: () => null,
+    );
+
+    return trailer;
+  }
+
+  Future<List<ActorsMovie>?> getAllAuthors(MovieModel MovieModel) async {
+    Uri actores = Uri.parse(
+        'https://api.themoviedb.org/3/movie/${MovieModel.id.toString()}/credits?api_key=a312589363702724132147d44222494f');
+    var result = await http.get(actores);
+    if (result.statusCode == 200) {
+      var listJSON = jsonDecode(result.body)['cast'] as List;
+      return listJSON.map((actor) => ActorsMovie.fromMap(actor)).toList();
+    }
+    return null;
+  }
+}

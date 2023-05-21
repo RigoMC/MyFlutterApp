@@ -1,13 +1,14 @@
 import 'dart:io';
 
+import 'package:email_validator/email_validator.dart';
 import 'package:flutter/material.dart';
-import '../widgets/loading_modal_widget.dart';
+import 'package:primer_proyecto/firebase/facebook_auth.dart';
+import 'package:primer_proyecto/firebase/firebase_auth.dart';
+import 'package:primer_proyecto/firebase/google_auth.dart';
+import 'package:primer_proyecto/responsive.dart';
+import 'package:primer_proyecto/widgets/loading_modal_widget.dart';
+import 'package:social_login_buttons/social_login_buttons.dart';
 import 'package:image_picker/image_picker.dart';
-
-final TextEditingController _nombreController = TextEditingController();
-final TextEditingController _txtemailController = TextEditingController();
-final TextEditingController _txtpassController = TextEditingController();
-final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -17,219 +18,416 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  XFile? _imageFile;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  final _formKey = GlobalKey<FormState>();
+
   bool isLoading = false;
-  File? _image;
 
-  Future<void> _showPickImageDialog() async {
-    final List<Widget> actions = [];
+  EmailAuth emailAuth = EmailAuth();
 
-    final ImagePicker _picker = ImagePicker();
-    actions.add(
-      ListTile(
-        leading: const Icon(Icons.photo_camera),
-        title: const Text('Tomar foto'),
-        onTap: () async {
-          final XFile? image = await _picker.pickImage(
-            source: ImageSource.camera,
-            imageQuality: 50,
-          );
-          Navigator.pop(context);
-          if (image != null) {
-            setState(() {
-              _image = File(image.path);
-            });
-          }
-        },
-      ),
-    );
+  FacebookAuthentication facebookAuthentication = FacebookAuthentication();
+  GoogleAuthentication googleAuthentication = GoogleAuthentication();
 
-    actions.add(
-      ListTile(
-        leading: const Icon(Icons.photo_library),
-        title: const Text('Seleccionar de galería'),
-        onTap: () async {
-          final XFile? image = await _picker.pickImage(
-            source: ImageSource.gallery,
-            imageQuality: 50,
-          );
-          Navigator.pop(context);
-          if (image != null) {
-            setState(() {
-              _image = File(image.path);
-            });
-          }
-        },
-      ),
-    );
+  TextEditingController email = TextEditingController();
+  TextEditingController password = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return SimpleDialog(
-          title: Text('Seleccionar imagen'),
-          children: actions,
-        );
-      },
-    );
-  }
-
-  final spaceHorizontal = const SizedBox(
-    height: 10,
-  );
-  final txtEmail = TextFormField(
-    controller: _txtemailController,
+  final txtName = TextFormField(
     decoration: const InputDecoration(
-        label: Text('Email User'), border: OutlineInputBorder()),
+        icon: Icon(Icons.person),
+        label: Text('Name: '),
+        border: OutlineInputBorder()),
+    validator: (value) {
+      if (value == null || value.isEmpty) {
+        return 'Please enter your name';
+      }
+      return null;
+    },
   );
-  final txtNombre = TextFormField(
-    controller: _nombreController,
-    decoration: const InputDecoration(
-        label: Text('Full Name'), border: OutlineInputBorder()),
-  );
-  final txtPass = TextFormField(
-    controller: _txtpassController,
-    decoration: const InputDecoration(
-        label: Text('Password User'), border: OutlineInputBorder()),
-  );
-
-  AlertDialog createAlertDialog(String message) {
-    return AlertDialog(
-      title: const Text('Alert'),
-      content: Text(message),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: const Text('OK'),
-        ),
-      ],
-    );
-  }
-
-  bool validData() {
-    bool valid = true;
-    if (_nombreController.text == '' ||
-        _txtemailController.text == '' ||
-        _txtpassController.text == '') {
-      valid = false;
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return createAlertDialog('Missing data');
-        },
-      );
-    }
-    if (!(emailRegex.hasMatch(_txtemailController.text))) {
-      valid = false;
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return createAlertDialog('Email is wrong');
-        },
-      );
-    }
-    return valid;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final imgPP = Container(
-      decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-              width: 2, color: Theme.of(context).colorScheme.primary)),
-      child: GestureDetector(
-        onTap: _showPickImageDialog,
-        child: Container(
-          width: 150,
-          height: 150,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            image: DecorationImage(
-              fit: BoxFit.fill,
-              image: _image != null
-                  ? FileImage(File(_image!.path.toString()))
-                      as ImageProvider<Object>
-                  : const AssetImage('assets/avatar.png'),
-            ),
-          ),
-          child:
-              _image == null ? const Icon(Icons.add_a_photo, size: 50) : null,
-        ),
-      ),
+    final txtEmail = TextFormField(
+      decoration: const InputDecoration(
+          icon: Icon(Icons.email),
+          label: Text('Email: '),
+          border: OutlineInputBorder()),
+      controller: email,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter your email';
+        } else if (!EmailValidator.validate(value, true)) {
+          return 'Invalid email, please enter valid email';
+        } else {
+          return null;
+        }
+      },
     );
 
-    final lblRegister = Text(
-      'Registro',
-      style: TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary),
-    );
-    final btnSignUp = SizedBox(
-      width: 200,
-      height: 70,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        child: ElevatedButton(
-            onPressed: () {
-              if (validData()) Navigator.pushNamed(context, '/login');
-            },
-            child: const Text(
-              'Sign Up',
-              style: TextStyle(fontSize: 20),
-            )),
-      ),
+    final txtPassword = TextFormField(
+        obscureText: true,
+        decoration: const InputDecoration(
+            icon: Icon(Icons.password),
+            label: Text('Password: '),
+            border: OutlineInputBorder()),
+        controller: password,
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter a password';
+          } else if (!validateStructure(value)) {
+            return 'Please enter valid password';
+          } else {
+            return null;
+          }
+        });
+    final spaceHorizontal = SizedBox(
+      height: 10,
     );
 
     final txtLogin = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 15),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: TextButton(
           onPressed: () {
             Navigator.pushNamed(context, '/login');
           },
-          child: const Text(
-            'Log in',
-            style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                decoration: TextDecoration.underline),
-          )),
+          child: Text('Already have an account? Log in',
+              style: Theme.of(context).textTheme.labelLarge)),
+    );
+    final btnRegister = SocialLoginButton(
+        buttonType: SocialLoginButtonType.generalLogin,
+        text: 'Sign up',
+        onPressed: () {
+          if (_formKey.currentState!.validate()) {
+            emailAuth
+                .createUserWithEmailAndPassword(
+                    email: email.text, password: password.text)
+                .then((value) {
+              if (value) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Usuario registrado correctamente')),
+                );
+                Navigator.pushNamed(context, '/login');
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text(
+                          'Ya existe un usuario registrado con esta cuenta')),
+                );
+              }
+            });
+          }
+        });
+
+    final btnPhoto = InkWell(
+      onTap: () {
+        showSelectionDialog(context);
+      },
+      child: Icon(
+        Icons.add_a_photo,
+        size: 30.0,
+      ),
+    );
+
+    final photo = AssetImage('assets/perfil_default.png');
+
+    final imgAvatar = CircleAvatar(
+      radius: 80.0,
+      backgroundImage: _imageFile == null
+          ? photo
+          : Image.file(File(_imageFile!.path.toString())).image,
+      backgroundColor: Colors.white10,
+    );
+
+    final btnGoogle = SocialLoginButton(
+      buttonType: SocialLoginButtonType.google,
+      text: 'Continue with Google',
+      onPressed: () {
+        isLoading = true;
+        try {
+          googleAuthentication.signUpWithGoogle().then((value) {
+            if (value == 1) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Registro exitoso')),
+              );
+            } else if (value == 2) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('La cuenta ya esta registrada')),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ocurrio un error')),
+              );
+            }
+            isLoading = false;
+          });
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ocurrio un error----')),
+          );
+          print('Exception--------:$e');
+        }
+      },
+    );
+
+    final btnFacebook = SocialLoginButton(
+      buttonType: SocialLoginButtonType.facebook,
+      text: 'Continue with Facebook',
+      onPressed: () {
+        isLoading = true;
+        facebookAuthentication.signUpWithFacebook().then((value) {
+          if (value) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Registro exitoso')),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Ocurrio un error')),
+            );
+          }
+          isLoading = false;
+        });
+      },
     );
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      body: Stack(children: [
-        Container(
-          decoration: const BoxDecoration(
-              image: DecorationImage(
-                  opacity: .4,
-                  fit: BoxFit.cover,
-                  image: AssetImage('assets/fondo_itcelaya.jpeg'))),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Stack(alignment: Alignment.topCenter, children: [
-              Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                imgPP,
-                spaceHorizontal,
-                lblRegister,
-                spaceHorizontal,
-                txtNombre,
-                spaceHorizontal,
-                txtEmail,
-                spaceHorizontal,
-                txtPass,
-                spaceHorizontal,
-                btnSignUp,
-                spaceHorizontal,
-                txtLogin
-              ])
-            ]),
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+                image: DecorationImage(
+                    opacity: 0.5,
+                    fit: BoxFit.cover,
+                    image: AssetImage('assets/fondo.jpg'))),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  Form(
+                      key: _formKey,
+                      child: Responsive(
+                          mobile: MobileScreen(
+                              imgAvatar: imgAvatar,
+                              btnPhoto: btnPhoto,
+                              spaceHorizontal: spaceHorizontal,
+                              txtName: txtName,
+                              txtEmail: txtEmail,
+                              txtPassword: txtPassword,
+                              btnRegister: btnRegister,
+                              btnGoogle: btnGoogle,
+                              btnFacebook: btnFacebook,
+                              txtLogin: txtLogin),
+                          tablet: TabletDesktopScreen(
+                              imgAvatar: imgAvatar,
+                              btnPhoto: btnPhoto,
+                              spaceHorizontal: spaceHorizontal,
+                              txtName: txtName,
+                              txtEmail: txtEmail,
+                              txtPassword: txtPassword,
+                              btnRegister: btnRegister,
+                              btnGoogle: btnGoogle,
+                              btnFacebook: btnFacebook,
+                              txtLogin: txtLogin),
+                          desktop: TabletDesktopScreen(
+                              imgAvatar: imgAvatar,
+                              btnPhoto: btnPhoto,
+                              spaceHorizontal: spaceHorizontal,
+                              txtName: txtName,
+                              txtEmail: txtEmail,
+                              txtPassword: txtPassword,
+                              btnRegister: btnRegister,
+                              btnGoogle: btnGoogle,
+                              btnFacebook: btnFacebook,
+                              txtLogin: txtLogin))),
+                ],
+              ),
+            ),
           ),
-        ),
-        isLoading ? const LoadingModalWidget() : Container()
-      ]),
+          isLoading ? const LoadingModalWidget() : Container()
+        ],
+      ),
     );
   }
+
+  void showSelectionDialog(context) {
+    showDialog(
+        context: context,
+        builder: (BuildContext) {
+          return AlertDialog(
+            content: Container(
+              height: 120,
+              child: Column(
+                children: [
+                  ListTile(
+                    onTap: () {
+                      selectOpction(context, ImageSource.camera);
+                    },
+                    leading: Icon(
+                      Icons.camera,
+                      color: Theme.of(context).iconTheme.color,
+                    ),
+                    title: Text(
+                      'Camera',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ),
+                  ListTile(
+                    onTap: () {
+                      selectOpction(context, ImageSource.gallery);
+                    },
+                    leading: Icon(Icons.image,
+                        color: Theme.of(context).iconTheme.color),
+                    title: Text('Gallery',
+                        style: Theme.of(context).textTheme.bodyLarge),
+                  )
+                ],
+              ),
+            ),
+          );
+        });
+  }
+
+  void selectOpction(BuildContext context, ImageSource source) async {
+    final XFile? image = await _imagePicker.pickImage(source: source);
+    setState(() {
+      _imageFile = image;
+    });
+    Navigator.of(context).pop();
+  }
+}
+
+class MobileScreen extends StatelessWidget {
+  const MobileScreen({
+    super.key,
+    required this.imgAvatar,
+    required this.btnPhoto,
+    required this.spaceHorizontal,
+    required this.txtName,
+    required this.txtEmail,
+    required this.txtPassword,
+    required this.btnRegister,
+    required this.btnGoogle,
+    required this.btnFacebook,
+    required this.txtLogin,
+  });
+
+  final CircleAvatar imgAvatar;
+  final InkWell btnPhoto;
+  final SizedBox spaceHorizontal;
+  final TextFormField txtName;
+  final TextFormField txtEmail;
+  final TextFormField txtPassword;
+  final SocialLoginButton btnRegister;
+  final SocialLoginButton btnGoogle;
+  final SocialLoginButton btnFacebook;
+  final Padding txtLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        imgAvatar,
+        btnPhoto,
+        spaceHorizontal,
+        txtName,
+        spaceHorizontal,
+        txtEmail,
+        spaceHorizontal,
+        txtPassword,
+        spaceHorizontal,
+        btnRegister,
+        spaceHorizontal,
+        btnGoogle,
+        spaceHorizontal,
+        btnFacebook,
+        spaceHorizontal,
+        txtLogin
+      ],
+    );
+  }
+}
+
+class TabletDesktopScreen extends StatelessWidget {
+  const TabletDesktopScreen({
+    super.key,
+    required this.imgAvatar,
+    required this.btnPhoto,
+    required this.spaceHorizontal,
+    required this.txtName,
+    required this.txtEmail,
+    required this.txtPassword,
+    required this.btnRegister,
+    required this.btnGoogle,
+    required this.btnFacebook,
+    required this.txtLogin,
+  });
+
+  final CircleAvatar imgAvatar;
+  final InkWell btnPhoto;
+  final SizedBox spaceHorizontal;
+  final TextFormField txtName;
+  final TextFormField txtEmail;
+  final TextFormField txtPassword;
+  final SocialLoginButton btnRegister;
+  final SocialLoginButton btnGoogle;
+  final SocialLoginButton btnFacebook;
+  final Padding txtLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+            child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            imgAvatar,
+            spaceHorizontal,
+            btnPhoto,
+            spaceHorizontal,
+            spaceHorizontal,
+            btnRegister,
+            spaceHorizontal,
+            btnGoogle,
+            spaceHorizontal,
+            btnFacebook
+          ],
+        )),
+        Expanded(
+            child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 400,
+              child: Column(
+                children: [
+                  txtName,
+                  spaceHorizontal,
+                  txtEmail,
+                  spaceHorizontal,
+                  txtPassword,
+                  spaceHorizontal,
+                  txtLogin,
+                ],
+              ),
+            ),
+          ],
+        ))
+      ],
+    );
+  }
+}
+
+bool validateStructure(String value) {
+  String pattern = r'^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{6,}$';
+  RegExp regExp = new RegExp(pattern);
+  return regExp.hasMatch(value);
 }
